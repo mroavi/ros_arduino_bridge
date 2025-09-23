@@ -86,6 +86,40 @@
     setMotorSpeed(LEFT, leftSpeed);
     setMotorSpeed(RIGHT, rightSpeed);
   }
+#elif defined(ARDUINO_MOTOR_SHIELD_REV3) || defined(KS_L298P_SHIELD)
+  void initMotorController() {
+    pinMode(LEFT_MOTOR_DIR, OUTPUT);
+    pinMode(RIGHT_MOTOR_DIR, OUTPUT);
+    pinMode(LEFT_MOTOR_SPEED, OUTPUT);
+    pinMode(RIGHT_MOTOR_SPEED, OUTPUT);
+
+    // Stop motors at startup
+    digitalWrite(LEFT_MOTOR_DIR, LOW);
+    digitalWrite(RIGHT_MOTOR_DIR, LOW);
+    analogWrite(LEFT_MOTOR_SPEED, 0);
+    analogWrite(RIGHT_MOTOR_SPEED, 0);
+  }
+
+  void setMotorSpeed(int i, int spd) {
+    if (spd > 255) spd = 255;
+    if (spd < -255) spd = -255;
+
+    bool forward = (spd >= 0);
+    int pwm = abs(spd);
+
+    if (i == LEFT) {
+      digitalWrite(LEFT_MOTOR_DIR, forward ? HIGH : LOW);
+      analogWrite(LEFT_MOTOR_SPEED, pwm);
+    } else { // RIGHT
+      digitalWrite(RIGHT_MOTOR_DIR, forward ? HIGH : LOW);
+      analogWrite(RIGHT_MOTOR_SPEED, pwm);
+    }
+  }
+
+  void setMotorSpeeds(int leftSpeed, int rightSpeed) {
+    setMotorSpeed(LEFT, leftSpeed);
+    setMotorSpeed(RIGHT, rightSpeed);
+  }
 #else
   #error A motor driver must be selected!
 #endif

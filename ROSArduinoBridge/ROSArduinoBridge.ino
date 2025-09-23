@@ -63,7 +63,10 @@
    #define ARDUINO_ENC_COUNTER
 
    /* L298 Motor driver*/
-   #define L298_MOTOR_DRIVER
+   //#define L298_MOTOR_DRIVER
+
+   /* Arduino Motor Shield Rev3 / KS0007 (L298P) */
+   #define KS_L298P_SHIELD
 #endif
 
 //#define USE_SERVOS  // Enable use of PWM servos as defined in servos.h
