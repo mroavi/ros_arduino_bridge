@@ -60,7 +60,10 @@
    //#define ROBOGAIA
    
    /* Encoders directly attached to Arduino board */
-   #define ARDUINO_ENC_COUNTER
+   //#define ARDUINO_ENC_COUNTER
+
+   /* Encoders on Arduino Motor Shield Rev3 / KS0007 (L298P) */
+   #define L298P_ENC_COUNTER
 
    /* L298 Motor driver*/
    //#define L298_MOTOR_DRIVER
@@ -274,6 +277,18 @@ void setup() {
     
     // enable PCINT1 and PCINT2 interrupt in the general interrupt mask
     PCICR |= (1 << PCIE1) | (1 << PCIE2);
+  #elif defined(L298P_ENC_COUNTER)
+    // set pins as inputs
+    pinMode(LEFT_ENC_PIN_A, INPUT_PULLUP);
+    pinMode(LEFT_ENC_PIN_B, INPUT_PULLUP);
+    pinMode(RIGHT_ENC_PIN_A, INPUT_PULLUP);
+    pinMode(RIGHT_ENC_PIN_B, INPUT_PULLUP);
+
+    // attach interrupts
+    attachInterrupt(digitalPinToInterrupt(LEFT_ENC_PIN_A), isrLeftA, CHANGE);
+    attachPCINT(digitalPinToPCINT(LEFT_ENC_PIN_B), isrLeftB, CHANGE);
+    attachPCINT(digitalPinToPCINT(RIGHT_ENC_PIN_A), isrRightA, CHANGE);
+    attachPCINT(digitalPinToPCINT(RIGHT_ENC_PIN_B), isrRightB, CHANGE);
   #endif
   initMotorController();
   resetPID();

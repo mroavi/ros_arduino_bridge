@@ -68,6 +68,51 @@
       return;
     }
   }
+#elif defined(ARDUINO_MOTOR_SHIELD_REV3) || defined(KS_L298P_SHIELD)
+  // Encoder implementation for Rev3/KS0007 using PinChangeInterrupt library
+  #include <PinChangeInterrupt.h>
+  #include <util/atomic.h>
+
+  volatile long left_enc_pos = 0L;
+  volatile long right_enc_pos = 0L;
+
+  // Fast read macros
+  #define readLeftA   bitRead(PIND, LEFT_ENC_PIN_A)
+  #define readLeftB   bitRead(PIND, LEFT_ENC_PIN_B)
+  #define readRightA  bitRead(PIND, RIGHT_ENC_PIN_A)
+  #define readRightB  bitRead(PIND, RIGHT_ENC_PIN_B)
+
+  void isrLeftA()  { (readLeftB  != readLeftA)  ? left_enc_pos++  : left_enc_pos--; }
+  void isrLeftB()  { (readLeftA  == readLeftB)  ? left_enc_pos++  : left_enc_pos--; }
+  void isrRightA() { (readRightB != readRightA) ? right_enc_pos++ : right_enc_pos--; }
+  void isrRightB() { (readRightA == readRightB) ? right_enc_pos++ : right_enc_pos--; }
+
+  void initEncoders() {
+    pinMode(LEFT_ENC_PIN_A, INPUT_PULLUP);
+    pinMode(LEFT_ENC_PIN_B, INPUT_PULLUP);
+    pinMode(RIGHT_ENC_PIN_A, INPUT_PULLUP);
+    pinMode(RIGHT_ENC_PIN_B, INPUT_PULLUP);
+
+    attachInterrupt(digitalPinToInterrupt(LEFT_ENC_PIN_A), isrLeftA, CHANGE);
+    attachPCINT(digitalPinToPCINT(LEFT_ENC_PIN_B), isrLeftB, CHANGE);
+    attachPCINT(digitalPinToPCINT(RIGHT_ENC_PIN_A), isrRightA, CHANGE);
+    attachPCINT(digitalPinToPCINT(RIGHT_ENC_PIN_B), isrRightB, CHANGE);
+  }
+
+  long readEncoder(int i) {
+    long val;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      val = (i == LEFT) ? left_enc_pos : right_enc_pos;
+    }
+    return val;
+  }
+
+  void resetEncoder(int i) {
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      if (i == LEFT) left_enc_pos = 0L;
+      else right_enc_pos = 0L;
+    }
+  }
 #else
   #error A encoder driver must be selected!
 #endif
