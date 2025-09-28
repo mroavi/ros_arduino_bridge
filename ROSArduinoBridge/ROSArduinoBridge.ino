@@ -23,9 +23,9 @@
 #endif
 
 #ifdef USE_BASE
-#include "diff_controller.h"
-#include "encoder_driver.h"
 #include "motor_driver.h"
+#include "encoder_driver.h"
+#include "diff_controller.h"
 
 #define PID_RATE 30
 const int PID_INTERVAL = 1000 / PID_RATE;
