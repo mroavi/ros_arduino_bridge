@@ -1,7 +1,7 @@
 #include <Wire.h>
 
 /*********************************************************************
- *  ROSArduinoBridge (I2C Version with larger buffers)
+ *  ROSArduinoBridge (I2C Version, variable-length replies)
  *********************************************************************/
 
 #define USE_BASE
@@ -35,26 +35,28 @@ unsigned long nextPID = PID_INTERVAL;
 long lastMotorCommand = AUTO_STOP_INTERVAL;
 #endif
 
-/* Variable initialization */
-int arg = 0;
-int index = 0;
-char chr;
+/* Command parsing variables */
 char cmd;
 char argv1[16];
 char argv2[16];
 long arg1;
 long arg2;
 
-char replyBuffer[32]; // match Wire buffer limit
+char replyBuffer[32]; // reply buffer
 
+/* I2C buffering */
+#define CMD_BUFFER_SIZE 32
+volatile char i2cBuffer[CMD_BUFFER_SIZE];
+volatile size_t i2cIndex = 0;
+volatile bool commandReady = false;
+
+/* Helpers */
 void resetCommand() {
   cmd = 0;
   memset(argv1, 0, sizeof(argv1));
   memset(argv2, 0, sizeof(argv2));
   arg1 = 0;
   arg2 = 0;
-  arg = 0;
-  index = 0;
 }
 
 void writeResponse(const char *s) {
@@ -159,38 +161,32 @@ void runCommand() {
   }
 }
 
-/* I2C receive callback */
+/* I2C receive callback (ISR-safe: only buffer data) */
 void receiveEvent(int howMany) {
-  while (Wire.available()) {
-    chr = Wire.read();
-    if (chr == 13) { // '\r'
-      if (arg == 1)
-        argv1[index] = '\0';
-      else if (arg == 2)
-        argv2[index] = '\0';
-      runCommand();
-      resetCommand();
-    } else if (chr == ' ') {
-      if (arg == 0)
-        arg = 1;
-      else if (arg == 1) {
-        argv1[index] = '\0';
-        arg = 2;
-        index = 0;
-      }
+  while (Wire.available() && i2cIndex < CMD_BUFFER_SIZE - 1) {
+    char c = Wire.read();
+    if (c == '\r') {
+      i2cBuffer[i2cIndex] = '\0';
+      commandReady = true;
+      i2cIndex = 0;
     } else {
-      if (arg == 0)
-        cmd = chr;
-      else if (arg == 1)
-        argv1[index++] = chr;
-      else if (arg == 2)
-        argv2[index++] = chr;
+      i2cBuffer[i2cIndex++] = c;
     }
   }
 }
 
 /* I2C request callback */
-void requestEvent() { Wire.write((uint8_t *)replyBuffer, sizeof(replyBuffer)); }
+void requestEvent() {
+  if (replyBuffer[0] == '\0') {
+    strcpy(replyBuffer, "OK"); // fallback
+  }
+  size_t len = strnlen(replyBuffer, sizeof(replyBuffer));
+  if (len == 0) {
+    replyBuffer[0] = 'O'; replyBuffer[1] = 'K'; replyBuffer[2] = '\0';
+    len = 2;
+  }
+  Wire.write((uint8_t *)replyBuffer, len);
+}
 
 /* Setup */
 void setup() {
@@ -226,6 +222,29 @@ void loop() {
     moving = 0;
   }
 #endif
+
+  // Process commands outside ISR
+  if (commandReady) {
+    commandReady = false;
+
+    resetCommand();
+
+    // Parse command string from buffer
+    char *p = (char *)i2cBuffer;
+    cmd = *p++;
+    if (*p) {
+      char *space = strchr(p, ' ');
+      if (space) {
+        *space = '\0';
+        strncpy(argv1, p, sizeof(argv1) - 1);
+        strncpy(argv2, space + 1, sizeof(argv2) - 1);
+      } else {
+        strncpy(argv1, p, sizeof(argv1) - 1);
+      }
+    }
+
+    runCommand();
+  }
 
 #ifdef USE_SERVOS
   for (int i = 0; i < N_SERVOS; i++) {
